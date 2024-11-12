@@ -90,376 +90,371 @@ namespace BrutalCompanyMinus.Minus
         internal static float timeSpeedMultiplier = 1.0f;
         internal static float inverseTimeSpeedMultiplier = 1.0f;
 
+        internal static int randomSeedValue = 0;
+
+        private static List<Vector3> spawnDenialPoints = new List<Vector3>();
+
         /// <summary>
-        /// This is used to spawn objects, enemies or scrap in certain locations.
+        /// This is to be used inside of Execute(), will add to list to spawn object(s) safely.
         /// </summary>
-        public static class Spawn
+        public static void SpawnOutsideObjects(GameObject obj, Vector3 offset, float density, float radius = -1.0f, int objectCap = 1000) => BatchSpawnOutsideObjects(obj, offset, density, radius, objectCap);
+
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to list to spawn object(s) safely.
+        /// </summary>
+        public static void SpawnOutsideObjects(Assets.ObjectName objName, Vector3 offset, float density, float radius = -1.0f, int objectCap = 1000) => BatchSpawnOutsideObjects(Assets.GetObject(objName), offset, density, radius, objectCap);
+
+        private static void BatchSpawnOutsideObjects(GameObject obj, Vector3 offset, float density, float radius, int objectCap)
         {
-            internal static int randomSeedValue = 0;
+            if (obj == null) return;
 
-            private static List<Vector3> spawnDenialPoints = new List<Vector3>();
+            spawnDenialPoints = Helper.GetSpawnDenialNodes();
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to list to spawn object(s) safely.
-            /// </summary>
-            public static void OutsideObjects(GameObject obj, Vector3 offset, float density, float radius = -1.0f, int objectCap = 1000) => BatchOutsideObjects(obj, offset, density, radius, objectCap);
+            int count = (int)Mathf.Clamp(density * terrainArea, 0, objectCap); // Compute amount
+            Log.LogInfo(string.Format("Spawning: {0}, Count:{1}", obj.name, count));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to list to spawn object(s) safely.
-            /// </summary>
-            public static void OutsideObjects(Assets.ObjectName objName, Vector3 offset, float density, float radius = -1.0f, int objectCap = 1000) => BatchOutsideObjects(Assets.GetObject(objName), offset, density, radius, objectCap);
+            int batchSize = 8;
+            int batches = count / batchSize;
+            int remainder = count % batchSize;
 
-            private static void BatchOutsideObjects(GameObject obj, Vector3 offset, float density, float radius, int objectCap)
+            for (int i = 0; i < batches; i++)
             {
-                if (obj == null) return;
-
-                spawnDenialPoints = Helper.GetSpawnDenialNodes();
-
-                int count = (int)Mathf.Clamp(density * terrainArea, 0, objectCap); // Compute amount
-                Log.LogInfo(string.Format("Spawning: {0}, Count:{1}", obj.name, count));
-
-                int batchSize = 8;
-                int batches = count / batchSize;
-                int remainder = count % batchSize;
-
-                for (int i = 0; i < batches; i++)
-                {
-                    Net.Instance.objectsToSpawn.Add(obj);
-                    Net.Instance.objectsToSpawnRadius.Add(radius);
-                    Net.Instance.objectsToSpawnOffsets.Add(offset);
-                    Net.Instance.objectsToSpawnAmount.Add(batchSize);
-                }
-
                 Net.Instance.objectsToSpawn.Add(obj);
                 Net.Instance.objectsToSpawnRadius.Add(radius);
                 Net.Instance.objectsToSpawnOffsets.Add(offset);
-                Net.Instance.objectsToSpawnAmount.Add(remainder);
+                Net.Instance.objectsToSpawnAmount.Add(batchSize);
             }
 
-            /// <summary>
-            /// This is not safe to be used inside of Execute(), this will spawn client side objects.
-            /// </summary>
-            public static void DoSpawnOutsideObjects(int count, float radius, Vector3 offset, GameObject obj) 
+            Net.Instance.objectsToSpawn.Add(obj);
+            Net.Instance.objectsToSpawnRadius.Add(radius);
+            Net.Instance.objectsToSpawnOffsets.Add(offset);
+            Net.Instance.objectsToSpawnAmount.Add(remainder);
+        }
+
+        /// <summary>
+        /// This is not safe to be used inside of Execute(), this will spawn client side objects.
+        /// </summary>
+        public static void DoSpawnOutsideObjects(int count, float radius, Vector3 offset, GameObject obj)
+        {
+            for (int i = 0; i < count; i++)
             {
-                for (int i = 0; i < count; i++)
+                randomSeedValue++;
+
+                UnityEngine.Random.InitState(randomSeedValue++); // Important or wont be same on all clients
+                Vector3 position = new Vector3(0.0f, 0.0f, 0.0f);
+                if (radius != -1.0f || outsideObjectSpawnNodes.Count == 0)
                 {
-                    randomSeedValue++;
+                    position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(RoundManager.Instance.outsideAINodes[UnityEngine.Random.Range(0, RoundManager.Instance.outsideAINodes.Length)].transform.position, radius);
+                }
+                else
+                {
+                    position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(outsideObjectSpawnNodes[UnityEngine.Random.Range(0, outsideObjectSpawnNodes.Count)], outsideObjectSpawnRadius);
+                }
+                Quaternion rotation = obj.transform.rotation;
 
-                    UnityEngine.Random.InitState(randomSeedValue++); // Important or wont be same on all clients
-                    Vector3 position = new Vector3(0.0f, 0.0f, 0.0f);
-                    if (radius != -1.0f || outsideObjectSpawnNodes.Count == 0)
-                    {
-                        position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(RoundManager.Instance.outsideAINodes[UnityEngine.Random.Range(0, RoundManager.Instance.outsideAINodes.Length)].transform.position, radius);
-                    }
-                    else
-                    {
-                        position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(outsideObjectSpawnNodes[UnityEngine.Random.Range(0, outsideObjectSpawnNodes.Count)], outsideObjectSpawnRadius);
-                    }
-                    Quaternion rotation = obj.transform.rotation;
-
-                    RaycastHit info;
-                    bool isInvalidPosition = false;
-                    if (Physics.Raycast(new Ray(position, Vector3.down), out info))
-                    {
-                        if (info.collider.gameObject.tag != terrainTag && info.collider.gameObject.name != terrainName) // Did it hit terrain mesh? if not then position is not valid...
-                        {
-                            isInvalidPosition = true;
-                        }
-                    }
-                    else // If didn't hit anything, position is is invalid
+                RaycastHit info;
+                bool isInvalidPosition = false;
+                if (Physics.Raycast(new Ray(position, Vector3.down), out info))
+                {
+                    if (info.collider.gameObject.tag != terrainTag && info.collider.gameObject.name != terrainName) // Did it hit terrain mesh? if not then position is not valid...
                     {
                         isInvalidPosition = true;
                     }
-                    foreach (Vector3 spawnDenialPoint in spawnDenialPoints)
+                }
+                else // If didn't hit anything, position is is invalid
+                {
+                    isInvalidPosition = true;
+                }
+                foreach (Vector3 spawnDenialPoint in spawnDenialPoints)
+                {
+                    if (Vector3.Distance(position, spawnDenialPoint) <= 10.0f)
                     {
-                        if (Vector3.Distance(position, spawnDenialPoint) <= 10.0f)
-                        {
-                            isInvalidPosition = true;
-                        }
+                        isInvalidPosition = true;
                     }
+                }
 
-                    if (!isInvalidPosition)
-                    {
-                        position.y = info.point.y; // Match raycast hit y position
+                if (!isInvalidPosition)
+                {
+                    position.y = info.point.y; // Match raycast hit y position
 
-                        position += offset;
-                        rotation.eulerAngles += new Vector3(0.0f, UnityEngine.Random.Range(0, 360), 0.0f);
+                    position += offset;
+                    rotation.eulerAngles += new Vector3(0.0f, UnityEngine.Random.Range(0, 360), 0.0f);
 
-                        GameObject gameObject = UnityEngine.Object.Instantiate(obj, position, rotation);
+                    GameObject gameObject = UnityEngine.Object.Instantiate(obj, position, rotation);
 
-                        NetworkObject netObject = gameObject.GetComponent<NetworkObject>();
-                        if (netObject != null) gameObject.GetComponent<NetworkObject>().Spawn(true);
+                    NetworkObject netObject = gameObject.GetComponent<NetworkObject>();
+                    if (netObject != null) gameObject.GetComponent<NetworkObject>().Spawn(true);
 
-                        objectsToClear.Add(gameObject);
-                    }
+                    objectsToClear.Add(gameObject);
                 }
             }
+        }
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void OutsideEnemies(GameObject enemy, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(enemy, count));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnOutsideEnemies(GameObject enemy, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(enemy, count));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void OutsideEnemies(EnemyType enemy, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(enemy.enemyPrefab, count));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnOutsideEnemies(EnemyType enemy, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(enemy.enemyPrefab, count));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void OutsideEnemies(Assets.EnemyName enemyName, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(Assets.GetEnemy(enemyName).enemyPrefab, count));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnOutsideEnemies(Assets.EnemyName enemyName, int count) => enemiesToSpawnOutside.Add(new ObjectInfo(Assets.GetEnemy(enemyName).enemyPrefab, count));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void InsideEnemies(GameObject enemy, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(enemy, count, 0.0f, radius));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnInsideEnemies(GameObject enemy, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(enemy, count, 0.0f, radius));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void InsideEnemies(EnemyType enemy, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(enemy.enemyPrefab, count, 0.0f, radius));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnInsideEnemies(EnemyType enemy, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(enemy.enemyPrefab, count, 0.0f, radius));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
-            /// </summary>
-            public static void InsideEnemies(Assets.EnemyName enemyName, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(Assets.GetEnemy(enemyName).enemyPrefab, count, 0.0f, radius));
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn enemie(s) safely.
+        /// </summary>
+        public static void SpawnInsideEnemies(Assets.EnemyName enemyName, int count, float radius = 0.0f) => enemiesToSpawnInside.Add(new ObjectInfo(Assets.GetEnemy(enemyName).enemyPrefab, count, 0.0f, radius));
 
-            /// <summary>
-            /// This is to be used inside of Execute(), will add to a list to spawn scrap outside safely.
-            /// </summary>
-            public static void OutsideScrap(int Amount) => randomItemsToSpawnOutsideCount += Amount;
-            
-            /// <summary>
-            /// This is not safe to be used inside of Execute(), will spawn the enemie(s) using outsideAINodes.
-            /// </summary>
-            /// <returns>Returns EnemyAI scripts after spawned.</returns>
-            public static List<EnemyAI> DoSpawnOutsideEnemies()
+        /// <summary>
+        /// This is to be used inside of Execute(), will add to a list to spawn scrap outside safely.
+        /// </summary>
+        public static void SpawnOutsideScrap(int Amount) => randomItemsToSpawnOutsideCount += Amount;
+
+        /// <summary>
+        /// This is not safe to be used inside of Execute(), will spawn the enemie(s) using outsideAINodes.
+        /// </summary>
+        /// <returns>Returns EnemyAI scripts after spawned.</returns>
+        public static List<EnemyAI> DoSpawnOutsideEnemies()
+        {
+            if (Events.SafeOutside.Active)
             {
-                if(Events.SafeOutside.Active)
-                {
-                    Log.LogInfo("Outside spawning prevented by OutsideSafe");
-                    return new List<EnemyAI>();
-                }
-                List<EnemyAI> spawnedEnemies = new List<EnemyAI>();
-
-                List<Vector3> OutsideAiNodes = Helper.GetOutsideNodes();
-                List<Vector3> SpawnDenialNodes = Helper.GetSpawnDenialNodes();
-
-                // Spawn Outside enemies
-                for (int i = 0; i < enemiesToSpawnOutside.Count; i++)
-                {
-                    for (int j = 0; j < enemiesToSpawnOutside[i].count; j++)
-                    {
-                        if (enemiesToSpawnOutside[i].obj == null)
-                        {
-                            Log.LogError("Enemy prefab on DoSpawnOutsideEnemies() is null, continuing.");
-                            continue;
-                        }
-                        GameObject obj = UnityEngine.Object.Instantiate(
-                            enemiesToSpawnOutside[i].obj,
-                            Helper.GetSafePosition(OutsideAiNodes, SpawnDenialNodes, 20.0f, seed++),
-                            Quaternion.Euler(Vector3.zero));
-
-                        EnemyAI ai = obj.GetComponent<EnemyAI>();
-                        spawnedEnemies.Add(ai);
-                        RoundManager.Instance.SpawnedEnemies.Add(ai);
-
-                        obj.gameObject.GetComponentInChildren<NetworkObject>().Spawn(destroyWithScene: true);
-                    }
-                }
-                enemiesToSpawnOutside.Clear();
-                return spawnedEnemies;
+                Log.LogInfo("Outside spawning prevented by OutsideSafe");
+                return new List<EnemyAI>();
             }
+            List<EnemyAI> spawnedEnemies = new List<EnemyAI>();
 
-            /// <summary>
-            /// This is not safe to be used inside of Execute(), will spawn the enemie(s) using using vents.
-            /// </summary>
-            /// <returns>Returns EnemyAI scripts after spawned.</returns>
-            public static List<EnemyAI> DoSpawnInsideEnemies()
+            List<Vector3> OutsideAiNodes = Helper.GetOutsideNodes();
+            List<Vector3> SpawnDenialNodes = Helper.GetSpawnDenialNodes();
+
+            // Spawn Outside enemies
+            for (int i = 0; i < enemiesToSpawnOutside.Count; i++)
             {
-                List<EnemyAI> spawnedEnemies = new List<EnemyAI>();
-
-                // Spawn Inside enemies
-                for (int i = 0; i < enemiesToSpawnInside.Count; i++)
+                for (int j = 0; j < enemiesToSpawnOutside[i].count; j++)
                 {
-                    for (int j = 0; j < enemiesToSpawnInside[i].count; j++)
+                    if (enemiesToSpawnOutside[i].obj == null)
                     {
-                        if (enemiesToSpawnInside[i].obj == null)
-                        {
-                            Log.LogError("Enemy prefab on DoSpawnInsideEnemies() is null, continuing.");
-                            continue;
-                        }
-                        int index = UnityEngine.Random.Range(0, RoundManager.Instance.allEnemyVents.Length);
-                        Vector3 position = RoundManager.Instance.allEnemyVents[index].floorNode.position;
-                        position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(position, enemiesToSpawnInside[i].radius, RoundManager.Instance.navHit);
-                        Quaternion rotation = Quaternion.Euler(0.0f, RoundManager.Instance.allEnemyVents[index].floorNode.eulerAngles.y, 0.0f);
-                        GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(enemiesToSpawnInside[i].obj, position, rotation);
-
-                        gameObject.GetComponentInChildren<NetworkObject>().Spawn(true);
-                        EnemyAI ai = gameObject.GetComponent<EnemyAI>();
-
-                        spawnedEnemies.Add(ai);
-
-                        RoundManager.Instance.SpawnedEnemies.Add(ai);
-                    }
-                }
-                enemiesToSpawnInside.Clear();
-
-                return spawnedEnemies;
-            }
-
-            /// <summary>
-            /// This is not safe to be used inside of Execute(), this will spawn scrap outside using outsideAINodes.
-            /// </summary>
-            /// <returns>Returns all NetworkObjectReferences and ScrapValues</returns>
-            public static ScrapSpawnInfo DoSpawnScrapOutside(int Amount)
-            {
-                if (Amount <= 0) return new ScrapSpawnInfo(new NetworkObjectReference[] { }, new int[] { });
-
-                RoundManager r = RoundManager.Instance;
-                System.Random rng = new System.Random();
-
-                // Generate Scrap To Spawn
-                List<Item> ScrapToSpawn = GetScrapToSpawn((int)(Amount * r.scrapAmountMultiplier * scrapAmountMultiplier));
-                List<int> ScrapValues = new List<int>();
-
-                // Spawn Scrap
-                List<NetworkObjectReference> ScrapSpawnsNet = new List<NetworkObjectReference>();
-                List<Vector3> OutsideNodes = Helper.GetOutsideNodes();
-
-                Log.LogInfo($"Spawning {ScrapToSpawn.Count} outside");
-                for (int i = 0; i < ScrapToSpawn.Count; i++)
-                {
-                    if (ScrapToSpawn[i] == null)
-                    {
-                        Log.LogError("Found null element in list ScrapToSpawn. Skipping it.");
+                        Log.LogError("Enemy prefab on DoSpawnOutsideEnemies() is null, continuing.");
                         continue;
                     }
-                    Vector3 position = r.GetRandomNavMeshPositionInBoxPredictable(OutsideNodes[UnityEngine.Random.Range(0, OutsideNodes.Count)], 10.0f, r.navHit, rng);
-                    GameObject obj = UnityEngine.Object.Instantiate(ScrapToSpawn[i].spawnPrefab, position, Quaternion.identity, r.spawnedScrapContainer);
-                    GrabbableObject grabbableObject = obj.GetComponent<GrabbableObject>();
-                    grabbableObject.transform.rotation = Quaternion.Euler(grabbableObject.itemProperties.restingRotation);
-                    grabbableObject.fallTime = 0.0f;
-                    ScrapValues.Add((int)(UnityEngine.Random.Range(ScrapToSpawn[i].minValue, ScrapToSpawn[i].maxValue + 1) * r.scrapValueMultiplier * scrapValueMultiplier));  
-                    grabbableObject.scrapValue = ScrapValues[ScrapValues.Count - 1];
-                    NetworkObject netObj = obj.GetComponent<NetworkObject>();
-                    netObj.Spawn();
-                    ScrapSpawnsNet.Add(netObj);
-                }
-                
-                return new ScrapSpawnInfo(ScrapSpawnsNet.ToArray(), ScrapValues.ToArray());
-            }
+                    GameObject obj = UnityEngine.Object.Instantiate(
+                        enemiesToSpawnOutside[i].obj,
+                        Helper.GetSafePosition(OutsideAiNodes, SpawnDenialNodes, 20.0f, seed++),
+                        Quaternion.Euler(Vector3.zero));
 
-            /// <summary>
-            /// This is not safe to be used inside of Execute(), this will spawn scrap inside using randomScrapSpawn.
-            /// </summary>
-            /// <returns>Returns all NetworkObjectReferences and ScrapValues</returns>
-            public static ScrapSpawnInfo DoSpawnScrapInside(int Amount) 
+                    EnemyAI ai = obj.GetComponent<EnemyAI>();
+                    spawnedEnemies.Add(ai);
+                    RoundManager.Instance.SpawnedEnemies.Add(ai);
+
+                    obj.gameObject.GetComponentInChildren<NetworkObject>().Spawn(destroyWithScene: true);
+                }
+            }
+            enemiesToSpawnOutside.Clear();
+            return spawnedEnemies;
+        }
+
+        /// <summary>
+        /// This is not safe to be used inside of Execute(), will spawn the enemie(s) using using vents.
+        /// </summary>
+        /// <returns>Returns EnemyAI scripts after spawned.</returns>
+        public static List<EnemyAI> DoSpawnInsideEnemies()
+        {
+            List<EnemyAI> spawnedEnemies = new List<EnemyAI>();
+
+            // Spawn Inside enemies
+            for (int i = 0; i < enemiesToSpawnInside.Count; i++)
             {
-                if (Amount <= 0) return new ScrapSpawnInfo(new NetworkObjectReference[] { }, new int[] { });
-
-                RoundManager r = RoundManager.Instance;
-                System.Random rng = new System.Random();
-
-                RandomScrapSpawn randomScrapSpawn = null;
-                RandomScrapSpawn[] source = UnityEngine.Object.FindObjectsOfType<RandomScrapSpawn>();
-                List<RandomScrapSpawn> usedSpawns = new List<RandomScrapSpawn>();
-                List<Item> ScrapToSpawn = GetScrapToSpawn(Amount);
-
-                List<int> ScrapValues = new List<int>();
-                List<NetworkObjectReference> NetScrapList = new List<NetworkObjectReference>();
-
-                Log.LogInfo($"Spawning {ScrapToSpawn.Count} inside");
-                for (int i = 0; i < ScrapToSpawn.Count; i++)
+                for (int j = 0; j < enemiesToSpawnInside[i].count; j++)
                 {
-                    if (ScrapToSpawn[i] == null)
+                    if (enemiesToSpawnInside[i].obj == null)
                     {
-                        Log.LogError("Null entry in scrapToSpawn, skipping entry");
+                        Log.LogError("Enemy prefab on DoSpawnInsideEnemies() is null, continuing.");
                         continue;
                     }
-                    List<RandomScrapSpawn> scrapSpawnPositions = ((ScrapToSpawn[i].spawnPositionTypes != null && ScrapToSpawn[i].spawnPositionTypes.Count != 0) ? source.Where((RandomScrapSpawn x) => ScrapToSpawn[i].spawnPositionTypes.Contains(x.spawnableItems) && !x.spawnUsed).ToList() : source.ToList());
-                    if(scrapSpawnPositions.Count <= 0)
-                    {
-                        Log.LogError("No positions to spawn scrap: " + ScrapToSpawn[i].itemName);
-                        continue;
-                    }
-                    if(usedSpawns.Count > 0 && scrapSpawnPositions.Contains(randomScrapSpawn))
-                    {
-                        scrapSpawnPositions.RemoveAll((RandomScrapSpawn x) => usedSpawns.Contains(x));
-                        if(scrapSpawnPositions.Count <= 0)
-                        {
-                            usedSpawns.Clear();
-                            i--;
-                            continue;
-                        }
-                    }
+                    int index = UnityEngine.Random.Range(0, RoundManager.Instance.allEnemyVents.Length);
+                    Vector3 position = RoundManager.Instance.allEnemyVents[index].floorNode.position;
+                    position = RoundManager.Instance.GetRandomNavMeshPositionInRadius(position, enemiesToSpawnInside[i].radius, RoundManager.Instance.navHit);
+                    Quaternion rotation = Quaternion.Euler(0.0f, RoundManager.Instance.allEnemyVents[index].floorNode.eulerAngles.y, 0.0f);
+                    GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(enemiesToSpawnInside[i].obj, position, rotation);
 
-                    randomScrapSpawn = scrapSpawnPositions[rng.Next(0, scrapSpawnPositions.Count)];
-                    usedSpawns.Add(randomScrapSpawn);
+                    gameObject.GetComponentInChildren<NetworkObject>().Spawn(true);
+                    EnemyAI ai = gameObject.GetComponent<EnemyAI>();
 
-                    Vector3 pos;
-                    if(randomScrapSpawn.spawnedItemsCopyPosition)
-                    {
-                        randomScrapSpawn.spawnUsed = true;
-                        pos = randomScrapSpawn.transform.position;
-                    } else
-                    {
-                        pos = r.GetRandomNavMeshPositionInBoxPredictable(randomScrapSpawn.transform.position, randomScrapSpawn.itemSpawnRange, r.navHit, rng) + Vector3.up * ScrapToSpawn[i].verticalOffset;
-                    }
+                    spawnedEnemies.Add(ai);
 
-                    if (ScrapToSpawn[i].spawnPrefab.GetComponent<GrabbableObject>() == null)
-                    {
-                        Log.LogError("GrabbableObject is null in scrapToSpawn, skipping entry.");
-                        continue;
-                    }
-
-                    GameObject scrap = GameObject.Instantiate(ScrapToSpawn[i].spawnPrefab, pos, Quaternion.identity, r.spawnedScrapContainer);
-                    GrabbableObject grabbableObject = scrap.GetComponent<GrabbableObject>();
-                    grabbableObject.transform.rotation = Quaternion.Euler(grabbableObject.itemProperties.restingRotation);
-                    grabbableObject.fallTime = 0.0f;
-
-                    int ScrapValue = (int)(UnityEngine.Random.Range(ScrapToSpawn[i].minValue, ScrapToSpawn[i].maxValue + 1) * r.scrapValueMultiplier * scrapValueMultiplier);
-                    ScrapValues.Add(ScrapValue);
-                    grabbableObject.scrapValue = ScrapValue;
-
-                    NetworkObject netObj = scrap.GetComponent<NetworkObject>();
-                    netObj.Spawn();
-                    NetScrapList.Add(netObj);
+                    RoundManager.Instance.SpawnedEnemies.Add(ai);
                 }
-
-                return new ScrapSpawnInfo(NetScrapList.ToArray(), ScrapValues.ToArray());
             }
+            enemiesToSpawnInside.Clear();
 
-            private static int seed = 0;
-            private static List<Item> GetScrapToSpawn(int Amount)
+            return spawnedEnemies;
+        }
+
+        /// <summary>
+        /// This is not safe to be used inside of Execute(), this will spawn scrap outside using outsideAINodes.
+        /// </summary>
+        /// <returns>Returns all NetworkObjectReferences and ScrapValues</returns>
+        public static ScrapSpawnInfo DoSpawnScrapOutside(int Amount)
+        {
+            if (Amount <= 0) return new ScrapSpawnInfo(new NetworkObjectReference[] { }, new int[] { });
+
+            RoundManager r = RoundManager.Instance;
+            System.Random rng = new System.Random();
+
+            // Generate Scrap To Spawn
+            List<Item> ScrapToSpawn = GetScrapToSpawn((int)(Amount * r.scrapAmountMultiplier * scrapAmountMultiplier));
+            List<int> ScrapValues = new List<int>();
+
+            // Spawn Scrap
+            List<NetworkObjectReference> ScrapSpawnsNet = new List<NetworkObjectReference>();
+            List<Vector3> OutsideNodes = Helper.GetOutsideNodes();
+
+            Log.LogInfo($"Spawning {ScrapToSpawn.Count} outside");
+            for (int i = 0; i < ScrapToSpawn.Count; i++)
             {
-                RoundManager r = RoundManager.Instance;
-                System.Random rng = new System.Random(StartOfRound.Instance.randomMapSeed + seed);
-                seed++;
-
-                List<Item> ScrapToSpawn = new List<Item>();
-                List<int> ScrapWeights = new List<int>();
-                for (int i = 0; i < r.currentLevel.spawnableScrap.Count; i++)
+                if (ScrapToSpawn[i] == null)
                 {
-                    if (i == r.increasedScrapSpawnRateIndex)
-                    {
-                        ScrapWeights.Add(i);
-                    }
-                    else
-                    {
-                        ScrapWeights.Add(r.currentLevel.spawnableScrap[i].rarity);
-                    }
+                    Log.LogError("Found null element in list ScrapToSpawn. Skipping it.");
+                    continue;
                 }
-                int[] weights = ScrapWeights.ToArray();
-                for (int i = 0; i < Amount; i++)
-                {
-                    Item pickedScrap = r.currentLevel.spawnableScrap[r.GetRandomWeightedIndex(weights, rng)].spawnableItem;
-                    ScrapToSpawn.Add(Assets.GetItem(pickedScrap.name));
-                }
-
-                return ScrapToSpawn;
+                Vector3 position = r.GetRandomNavMeshPositionInBoxPredictable(OutsideNodes[UnityEngine.Random.Range(0, OutsideNodes.Count)], 10.0f, r.navHit, rng);
+                GameObject obj = UnityEngine.Object.Instantiate(ScrapToSpawn[i].spawnPrefab, position, Quaternion.identity, r.spawnedScrapContainer);
+                GrabbableObject grabbableObject = obj.GetComponent<GrabbableObject>();
+                grabbableObject.transform.rotation = Quaternion.Euler(grabbableObject.itemProperties.restingRotation);
+                grabbableObject.fallTime = 0.0f;
+                ScrapValues.Add((int)(UnityEngine.Random.Range(ScrapToSpawn[i].minValue, ScrapToSpawn[i].maxValue + 1) * r.scrapValueMultiplier * scrapValueMultiplier));
+                grabbableObject.scrapValue = ScrapValues[ScrapValues.Count - 1];
+                NetworkObject netObj = obj.GetComponent<NetworkObject>();
+                netObj.Spawn();
+                ScrapSpawnsNet.Add(netObj);
             }
+
+            return new ScrapSpawnInfo(ScrapSpawnsNet.ToArray(), ScrapValues.ToArray());
+        }
+
+        /// <summary>
+        /// This is not safe to be used inside of Execute(), this will spawn scrap inside using randomScrapSpawn.
+        /// </summary>
+        /// <returns>Returns all NetworkObjectReferences and ScrapValues</returns>
+        public static ScrapSpawnInfo DoSpawnScrapInside(int Amount)
+        {
+            if (Amount <= 0) return new ScrapSpawnInfo(new NetworkObjectReference[] { }, new int[] { });
+
+            RoundManager r = RoundManager.Instance;
+            System.Random rng = new System.Random();
+
+            RandomScrapSpawn randomScrapSpawn = null;
+            RandomScrapSpawn[] source = UnityEngine.Object.FindObjectsOfType<RandomScrapSpawn>();
+            List<RandomScrapSpawn> usedSpawns = new List<RandomScrapSpawn>();
+            List<Item> ScrapToSpawn = GetScrapToSpawn(Amount);
+
+            List<int> ScrapValues = new List<int>();
+            List<NetworkObjectReference> NetScrapList = new List<NetworkObjectReference>();
+
+            Log.LogInfo($"Spawning {ScrapToSpawn.Count} inside");
+            for (int i = 0; i < ScrapToSpawn.Count; i++)
+            {
+                if (ScrapToSpawn[i] == null)
+                {
+                    Log.LogError("Null entry in scrapToSpawn, skipping entry");
+                    continue;
+                }
+                List<RandomScrapSpawn> scrapSpawnPositions = ((ScrapToSpawn[i].spawnPositionTypes != null && ScrapToSpawn[i].spawnPositionTypes.Count != 0) ? source.Where((RandomScrapSpawn x) => ScrapToSpawn[i].spawnPositionTypes.Contains(x.spawnableItems) && !x.spawnUsed).ToList() : source.ToList());
+                if (scrapSpawnPositions.Count <= 0)
+                {
+                    Log.LogError("No positions to spawn scrap: " + ScrapToSpawn[i].itemName);
+                    continue;
+                }
+                if (usedSpawns.Count > 0 && scrapSpawnPositions.Contains(randomScrapSpawn))
+                {
+                    scrapSpawnPositions.RemoveAll((RandomScrapSpawn x) => usedSpawns.Contains(x));
+                    if (scrapSpawnPositions.Count <= 0)
+                    {
+                        usedSpawns.Clear();
+                        i--;
+                        continue;
+                    }
+                }
+
+                randomScrapSpawn = scrapSpawnPositions[rng.Next(0, scrapSpawnPositions.Count)];
+                usedSpawns.Add(randomScrapSpawn);
+
+                Vector3 pos;
+                if (randomScrapSpawn.spawnedItemsCopyPosition)
+                {
+                    randomScrapSpawn.spawnUsed = true;
+                    pos = randomScrapSpawn.transform.position;
+                }
+                else
+                {
+                    pos = r.GetRandomNavMeshPositionInBoxPredictable(randomScrapSpawn.transform.position, randomScrapSpawn.itemSpawnRange, r.navHit, rng) + Vector3.up * ScrapToSpawn[i].verticalOffset;
+                }
+
+                if (ScrapToSpawn[i].spawnPrefab.GetComponent<GrabbableObject>() == null)
+                {
+                    Log.LogError("GrabbableObject is null in scrapToSpawn, skipping entry.");
+                    continue;
+                }
+
+                GameObject scrap = GameObject.Instantiate(ScrapToSpawn[i].spawnPrefab, pos, Quaternion.identity, r.spawnedScrapContainer);
+                GrabbableObject grabbableObject = scrap.GetComponent<GrabbableObject>();
+                grabbableObject.transform.rotation = Quaternion.Euler(grabbableObject.itemProperties.restingRotation);
+                grabbableObject.fallTime = 0.0f;
+
+                int ScrapValue = (int)(UnityEngine.Random.Range(ScrapToSpawn[i].minValue, ScrapToSpawn[i].maxValue + 1) * r.scrapValueMultiplier * scrapValueMultiplier);
+                ScrapValues.Add(ScrapValue);
+                grabbableObject.scrapValue = ScrapValue;
+
+                NetworkObject netObj = scrap.GetComponent<NetworkObject>();
+                netObj.Spawn();
+                NetScrapList.Add(netObj);
+            }
+
+            return new ScrapSpawnInfo(NetScrapList.ToArray(), ScrapValues.ToArray());
+        }
+
+        private static int seed = 0;
+        private static List<Item> GetScrapToSpawn(int Amount)
+        {
+            RoundManager r = RoundManager.Instance;
+            System.Random rng = new System.Random(StartOfRound.Instance.randomMapSeed + seed);
+            seed++;
+
+            List<Item> ScrapToSpawn = new List<Item>();
+            List<int> ScrapWeights = new List<int>();
+            for (int i = 0; i < r.currentLevel.spawnableScrap.Count; i++)
+            {
+                if (i == r.increasedScrapSpawnRateIndex)
+                {
+                    ScrapWeights.Add(i);
+                }
+                else
+                {
+                    ScrapWeights.Add(r.currentLevel.spawnableScrap[i].rarity);
+                }
+            }
+            int[] weights = ScrapWeights.ToArray();
+            for (int i = 0; i < Amount; i++)
+            {
+                Item pickedScrap = r.currentLevel.spawnableScrap[r.GetRandomWeightedIndex(weights, rng)].spawnableItem;
+                ScrapToSpawn.Add(Assets.GetItem(pickedScrap.name));
+            }
+
+            return ScrapToSpawn;
         }
 
         /// <summary>
@@ -870,11 +865,11 @@ namespace BrutalCompanyMinus.Minus
             SampleMap();
 
             // Client side objects
-            Spawn.randomSeedValue = StartOfRound.Instance.randomMapSeed + 2 + Net.Instance.GiveSeed(); // Reset seed value
+            randomSeedValue = StartOfRound.Instance.randomMapSeed + 2 + Net.Instance.GiveSeed(); // Reset seed value
             RoundManager.Instance.StartCoroutine(DelayedExecution());
 
             // Net objects
-            foreach (ObjectInfo obj in insideObjectsToSpawnOutside) Spawn.OutsideObjects(obj.obj, new Vector3(0.0f, -0.05f, 0.0f), obj.density, -1, 250); // 250 Cap for outside landmines and turrets as such
+            foreach (ObjectInfo obj in insideObjectsToSpawnOutside) SpawnOutsideObjects(obj.obj, new Vector3(0.0f, -0.05f, 0.0f), obj.density, -1, 250); // 250 Cap for outside landmines and turrets as such
         }
 
         private static IEnumerator DelayedExecution() // Delay this to fix trees not spawning in correctly on clients
@@ -882,7 +877,7 @@ namespace BrutalCompanyMinus.Minus
             yield return new WaitForSeconds(5.0f);
             foreach (OutsideObjectsToSpawn obj in Net.Instance.outsideObjectsToSpawn)
             {
-                Spawn.OutsideObjects(Assets.GetObject((Assets.ObjectName)obj.objectEnumID), new Vector3(0.0f, -1.0f, 0.0f), obj.density, -1, 1000); // 1000 cap for trees as such
+                SpawnOutsideObjects(Assets.GetObject((Assets.ObjectName)obj.objectEnumID), new Vector3(0.0f, -1.0f, 0.0f), obj.density, -1, 1000); // 1000 cap for trees as such
             }
         }
 
@@ -905,8 +900,8 @@ namespace BrutalCompanyMinus.Minus
 
             List<EnemyAI> spawnedAI = new List<EnemyAI>();
 
-            spawnedAI.AddRange(Spawn.DoSpawnInsideEnemies());
-            spawnedAI.AddRange(Spawn.DoSpawnOutsideEnemies());
+            spawnedAI.AddRange(DoSpawnInsideEnemies());
+            spawnedAI.AddRange(DoSpawnOutsideEnemies());
         }
         
         internal struct ObjectInfo

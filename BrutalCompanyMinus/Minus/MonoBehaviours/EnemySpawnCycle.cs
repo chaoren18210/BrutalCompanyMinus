@@ -191,8 +191,8 @@ namespace BrutalCompanyMinus.Minus.MonoBehaviours
                     if (currentSpawned >= spawnCap) return;
                     currentSpawned++;
 
-                    Manager.Spawn.InsideEnemies(enemy, 1);
-                    Manager.Spawn.DoSpawnInsideEnemies();
+                    Manager.SpawnInsideEnemies(enemy, 1);
+                    Manager.DoSpawnInsideEnemies();
                     Log.LogInfo($"!!! Succeeded spawning {enemy.name} inside.");
                     return;
                 }
@@ -208,8 +208,8 @@ namespace BrutalCompanyMinus.Minus.MonoBehaviours
                     if (currentSpawned >= spawnCap) return;
                     currentSpawned++;
 
-                    Manager.Spawn.OutsideEnemies(enemy, 1);
-                    Manager.Spawn.DoSpawnOutsideEnemies();
+                    Manager.SpawnOutsideEnemies(enemy, 1);
+                    Manager.DoSpawnOutsideEnemies();
                     Log.LogInfo($"!!! Succeeded spawning {enemy.name} outside.");
                     return;
                 }

@@ -47,8 +47,8 @@ namespace BrutalCompanyMinus.Minus.Events
             Manager.AddEnemyToPoolWithRarity(ref RoundManager.Instance.currentLevel.OutsideEnemies, bee, monsterEvents[0].outsideSpawnRarity.Compute(Type));
             Manager.AddEnemyToPoolWithRarity(ref RoundManager.Instance.currentLevel.DaytimeEnemies, bee, Get(ScaleType.DaytimeEnemyRarity));
 
-            Manager.Spawn.InsideEnemies(bee, UnityEngine.Random.Range(monsterEvents[0].minInside.Compute(Type), monsterEvents[0].maxInside.Compute(Type) + 1), 30.0f);
-            Manager.Spawn.OutsideEnemies(bee, UnityEngine.Random.Range(monsterEvents[0].minOutside.Compute(Type), monsterEvents[0].maxOutside.Compute(Type) + 1));
+            Manager.SpawnInsideEnemies(bee, UnityEngine.Random.Range(monsterEvents[0].minInside.Compute(Type), monsterEvents[0].maxInside.Compute(Type) + 1), 30.0f);
+            Manager.SpawnOutsideEnemies(bee, UnityEngine.Random.Range(monsterEvents[0].minOutside.Compute(Type), monsterEvents[0].maxOutside.Compute(Type) + 1));
         }
     }
 }

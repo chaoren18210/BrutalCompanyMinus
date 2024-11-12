@@ -29,6 +29,6 @@ namespace BrutalCompanyMinus.Minus.Events
             ScaleList.Add(ScaleType.MaxItemAmount, new Scale(12.0f, 0.12f, 12.0f, 24.0f));
         }
 
-        public override void Execute() => Manager.Spawn.OutsideScrap(UnityEngine.Random.Range(Get(ScaleType.MinItemAmount), Get(ScaleType.MaxItemAmount) + 1));
+        public override void Execute() => Manager.SpawnOutsideScrap(UnityEngine.Random.Range(Get(ScaleType.MinItemAmount), Get(ScaleType.MaxItemAmount) + 1));
     }
 }

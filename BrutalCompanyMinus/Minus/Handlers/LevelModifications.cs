@@ -121,7 +121,7 @@ namespace BrutalCompanyMinus.Minus.Handlers
             Manager.ScrapSpawnInfo insideScrap = new Manager.ScrapSpawnInfo(new NetworkObjectReference[] { }, new int[] { });
             if(scrapDiffernce >= 0) // Add more scrap if multiplier >= x1.0
             {
-                insideScrap = Manager.Spawn.DoSpawnScrapInside(scrapDiffernce);
+                insideScrap = Manager.DoSpawnScrapInside(scrapDiffernce);
             } else // Remove scrap if multiplier < x1.0
             {
                 amountRemoved = (int)Mathf.Clamp(scrapDiffernce * -1, 0, scrapValues.Length - 1);
@@ -136,7 +136,7 @@ namespace BrutalCompanyMinus.Minus.Handlers
                     }
                 }
             }
-            Manager.ScrapSpawnInfo outsideScrap = Manager.Spawn.DoSpawnScrapOutside(Manager.randomItemsToSpawnOutsideCount);
+            Manager.ScrapSpawnInfo outsideScrap = Manager.DoSpawnScrapOutside(Manager.randomItemsToSpawnOutsideCount);
 
             List<NetworkObjectReference> newSpawnedScrapList = new List<NetworkObjectReference>();
             List<int> newScrapValuesList = new List<int>();

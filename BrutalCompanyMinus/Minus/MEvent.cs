@@ -17,9 +17,6 @@ namespace BrutalCompanyMinus.Minus
         /// </summary>
         public string ColorHex = "#FFFFFF";
 
-        /// <summary>
-        /// This can be ignored, this value is only used when Use_Custom_Weights in the config is set to true.
-        /// </summary>
         public int Weight = 1;
 
         /// <summary>
@@ -217,22 +214,22 @@ namespace BrutalCompanyMinus.Minus
             public MonsterEvent(EnemyType enemy, Scale insideSpawnRarity, Scale outsideSpawnRarity, Scale minInside, Scale maxInside, Scale minOutside, Scale maxOutside)
             {
                 this.enemy = enemy;
-                assignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
+                AssignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
             }
 
             public MonsterEvent(Assets.EnemyName enemyName, Scale insideSpawnRarity, Scale outsideSpawnRarity, Scale minInside, Scale maxInside, Scale minOutside, Scale maxOutside)
             {
                 this.enemy = Assets.GetEnemy(enemyName);
-                assignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
+                AssignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
             }
 
             public MonsterEvent(string enemyName, Scale insideSpawnRarity, Scale outsideSpawnRarity, Scale minInside, Scale maxInside, Scale minOutside, Scale maxOutside)
             {
                 this.enemy = Assets.GetEnemy(enemyName);
-                assignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
+                AssignRarities(insideSpawnRarity, outsideSpawnRarity, minInside, maxInside, minOutside, maxOutside);
             }
 
-            private void assignRarities(Scale insideSpawnRarity, Scale outsideSpawnRarity, Scale minInside, Scale maxInside, Scale minOutside, Scale maxOutside)
+            private void AssignRarities(Scale insideSpawnRarity, Scale outsideSpawnRarity, Scale minInside, Scale maxInside, Scale minOutside, Scale maxOutside)
             {
                 this.insideSpawnRarity = insideSpawnRarity;
                 this.outsideSpawnRarity = outsideSpawnRarity;
@@ -246,8 +243,8 @@ namespace BrutalCompanyMinus.Minus
             {
                 Manager.AddEnemyToPoolWithRarity(ref RoundManager.Instance.currentLevel.Enemies, enemy, insideSpawnRarity.Compute(eventType));
                 Manager.AddEnemyToPoolWithRarity(ref RoundManager.Instance.currentLevel.OutsideEnemies, enemy, outsideSpawnRarity.Compute(eventType));
-                Manager.Spawn.InsideEnemies(enemy, UnityEngine.Random.Range(minInside.Compute(eventType), maxInside.Compute(eventType) + 1)); 
-                Manager.Spawn.OutsideEnemies(enemy, UnityEngine.Random.Range(minOutside.Compute(eventType), maxOutside.Compute(eventType) + 1));
+                Manager.SpawnInsideEnemies(enemy, UnityEngine.Random.Range(minInside.Compute(eventType), maxInside.Compute(eventType) + 1)); 
+                Manager.SpawnOutsideEnemies(enemy, UnityEngine.Random.Range(minOutside.Compute(eventType), maxOutside.Compute(eventType) + 1));
             }
         }
 

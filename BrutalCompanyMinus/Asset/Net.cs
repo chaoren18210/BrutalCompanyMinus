@@ -73,7 +73,7 @@ namespace BrutalCompanyMinus
             }
             if(objectsToSpawn.Count > 0)
             {
-                Manager.Spawn.DoSpawnOutsideObjects(objectsToSpawnAmount[0], objectsToSpawnRadius[0], objectsToSpawnOffsets[0], objectsToSpawn[0]);
+                Manager.DoSpawnOutsideObjects(objectsToSpawnAmount[0], objectsToSpawnRadius[0], objectsToSpawnOffsets[0], objectsToSpawn[0]);
                 objectsToSpawn.RemoveAt(0);
                 objectsToSpawnAmount.RemoveAt(0);
                 objectsToSpawnRadius.RemoveAt(0);
