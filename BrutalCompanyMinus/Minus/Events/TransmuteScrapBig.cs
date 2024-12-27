@@ -23,7 +23,7 @@ namespace BrutalCompanyMinus.Minus.Events
             ColorHex = "#800000";
             Type = EventType.VeryBad;
 
-            ScaleList.Add(ScaleType.ScrapAmount, new Scale(1.0f, 0.005f, 1.0f, 1.5f));
+            ScaleList.Add(ScaleType.ScrapAmount, new Scale(1.4f, 0.005f, 1.0f, 1.5f));
             ScaleList.Add(ScaleType.Percentage, new Scale(0.5f, 0.005f, 0.5f, 0.75f));
 
             EventsToRemove = new List<string>() { nameof(RealityShift) };
@@ -56,7 +56,7 @@ namespace BrutalCompanyMinus.Minus.Events
             Manager.TransmuteScrap(Getf(ScaleType.Percentage), new SpawnableItemWithRarity() { spawnableItem = chosenScrap.spawnableItem, rarity = 100 });
 
             // Scale scrap amount abit more
-            float scrapValue = (chosenScrap.spawnableItem.minValue + chosenScrap.spawnableItem.maxValue) * 0.25f; // Intentionally
+            float scrapValue = (chosenScrap.spawnableItem.minValue + chosenScrap.spawnableItem.maxValue) * 0.8f; // Intentionally
             if (scrapValue <= 0) scrapValue = 40;
             Manager.scrapAmountMultiplier *= Mathf.Clamp(Mathf.Log(Assets.averageScrapValueList[Manager.GetLevelIndex()] / scrapValue, 5) + 1, 1.0f, 2.0f); // Range : [1.0f, 2.0f]
         }
